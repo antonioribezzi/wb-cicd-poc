@@ -1,0 +1,36 @@
+global:
+  enabled: true
+
+injector:
+  enabled: false
+
+server:
+  extraEnvironmentVars:
+    GOOGLE_REGION: global
+    GOOGLE_PROJECT: wb-cicd-poc
+    GOOGLE_APPLICATION_CREDENTIALS: /vault/userconfig/kms-creds/credentials.json
+
+  extraVolumes:
+    - type: 'secret'
+      name: 'kms-creds'
+
+  standalone:
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      seal "gcpckms" {
+        project     = "wb-cicd-poc"
+        region      = "global"
+        key_ring    = "vault_keyring"
+        crypto_key  = "vault_crypto_key"
+      }
+
+      storage "file" {
+        path = "/vault/data"
+      }
