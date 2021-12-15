@@ -19,5 +19,5 @@ resource "google_cloudbuild_trigger" "build-commit-trigger" {
   }
   name = "app-build-buildonly"
 
-  filename = "cloudbuild-buildonlt.yaml"
+  filename = "cloudbuild-buildonly.yaml"
 }
