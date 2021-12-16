@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  labels:
+    appl: vault-kubernetes-synchronizer
+  name: vault-kubernetes-synchronizer
+spec:
+  template:
+    spec:
+      containers:
+      - env:
+        - name: VAULT_ADDR
+          value: "http://vault.vault.svc:8200"
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        - name: VAULT_TOKEN_PATH
+          value: /vault/.vault-secret
+        - name: VAULT_SECRETS
+          value: secrets/cybernetics-prod/
+        image: "postfinance/vault-kubernetes-synchronizer:0.2.3"
+        name: vault-kubernetes-synchronizer
+        volumeMounts:
+        - mountPath: /vault
+          name: vault-token
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
+      initContainers:
+      - env:
+        - name: VAULT_ADDR
+          value: "http://vault.vault.svc:8200"
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        - name: VAULT_AUTH_MOUNT_PATH
+          value: kubernetes
+        - name: VAULT_ROLE
+          value: cybernetics-prod-read
+        - name: VAULT_TOKEN_PATH
+          value: /vault/.vault-secret
+        - name: ALLOW_FAIL
+          value: "false"
+        image: "postfinance/vault-kubernetes-authenticator:0.2.3"
+        imagePullPolicy: Always
+        name: vault-kubernetes-authenticator
+        volumeMounts:
+        - mountPath: /vault
+          name: vault-token
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: vault-token

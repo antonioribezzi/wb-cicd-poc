@@ -1,0 +1,63 @@
+steps:
+ # This step clones the app-deploy repository
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Clone env repository
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    gcloud source repos clone app-deploy && \
+    cd app-deploy && \
+    git checkout $_ENV && \
+    git config user.email $(gcloud auth list --filter=status:ACTIVE --format='value(account)')
+
+# Generate manifest
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Generate manifest
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+     sed "s/GOOGLE_CLOUD_PROJECT/${PROJECT_ID}/g" app-deploy/deployment.yaml.tpl | \
+     sed "s/COMMIT_SHA/${TAG_NAME}/g" > app-deploy/deployment.yaml
+
+# Push manifest 
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Push manifest
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+    set -x && \
+    cd app-deploy && \
+    git add deployment.yaml && \
+    git commit -m "Deploying image us-central1-docker.pkg.dev/$PROJECT_ID/docker-registry/hello-cybernetics:${TAG_NAME}
+    Built from tag ${TAG_NAME} of repository app-build
+    Author: $(git log --format='%an <%ae>' -n 1 HEAD)" && \
+    git push origin $_ENV
+
+
+ # Create next deployment trigger
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Create next deployment trigger
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+    if [[ $_ENV == "dev" ]]; then
+    gcloud beta builds triggers create cloud-source-repositories \
+    --repo app-build \
+    --name int-deploy--$( echo $TAG_NAME | tr '.' '-'}) \
+    --tag-pattern ${TAG_NAME} \
+    --build-config cloudbuild-deploy.yaml \
+    --substitutions _ENV=int \
+    --require-approval; \
+    elif [[ $_ENV == "int" ]]; then
+    gcloud beta builds triggers create cloud-source-repositories \
+    --repo app-build \
+    --name prod-deploy--$( echo $TAG_NAME | tr '.' '-'}) \
+    --tag-pattern ${TAG_NAME} \
+    --build-config cloudbuild-deploy.yaml \
+    --substitutions _ENV=prod \
+    --require-approval; \
+    fi

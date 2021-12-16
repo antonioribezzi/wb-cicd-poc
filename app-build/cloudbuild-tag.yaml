@@ -1,0 +1,64 @@
+steps:
+# Set version
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: version
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+     echo -n ${TAG_NAME} > templates/version.html
+
+
+# Unit tests
+- name: 'python:3.7-slim'
+  id: Test
+  entrypoint: /bin/sh
+  args:
+  - -c
+  - 'pip install flask && python test_app.py -v'
+
+#static code analysis by sonarqube
+- name: 'gcr.io/$PROJECT_ID/sonar-scanner:latest'
+  id: Sonarqube
+  args:
+  - '-Dsonar.host.url=https://sonarcloud.io'
+  - '-Dsonar.projectKey=appbuild'
+  - '-Dsonar.organization=antonioribezzi'
+  - '-Dsonar.sources=.' 
+  secretEnv: ['SONAR_TOKEN']
+
+# Builds image
+- name: 'gcr.io/cloud-builders/docker'
+  id: Build
+  args:
+  - 'build'
+  - '-t'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/docker-registry/hello-cybernetics:$TAG_NAME'
+  - '.'
+
+# Push image to Artifact Registry
+- name: 'gcr.io/cloud-builders/docker'
+  id: Push
+  args:
+  - 'push'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/docker-registry/hello-cybernetics:$TAG_NAME'
+
+ # Trigger dev deployment
+- name: 'gcr.io/cloud-builders/gcloud'
+  id: Trigger dev deployment
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+    gcloud beta builds triggers create cloud-source-repositories \
+    --repo app-build \
+    --name dev-deploy-$( echo $TAG_NAME | tr '.' '-'}) \
+    --tag-pattern ${TAG_NAME} \
+    --build-config cloudbuild-deploy.yaml \
+    --substitutions _ENV=dev &&
+    gcloud beta builds triggers run dev-deploy-$( echo $TAG_NAME | tr '.' '-'}) --tag ${TAG_NAME}
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/622319408386/secrets/sonarcloud-token/versions/1
+    env: SONAR_TOKEN

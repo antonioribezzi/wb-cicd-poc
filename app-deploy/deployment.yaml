@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-cybernetics
+  labels:
+    app: hello-cybernetics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-cybernetics
+  template:
+    metadata:
+      labels:
+        app: hello-cybernetics
+    spec:
+      containers:
+      - name: hello-cloudbuild
+        image: us-central1-docker.pkg.dev/wb-cicd-poc/docker-registry/hello-cybernetics:081ab33
+        ports:
+        - containerPort: 8080

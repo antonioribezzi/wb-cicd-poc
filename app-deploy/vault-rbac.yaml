@@ -1,0 +1,28 @@
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+  name: secret-admin
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["*"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+  name: secret-admin-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: cybernetics-apps-prod
+roleRef:
+  kind: Role
+  name: secret-admin
+  apiGroup: rbac.authorization.k8s.io
+
